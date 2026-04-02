@@ -240,6 +240,52 @@ def health():
     return {"status": "ok", "collection": COLLECTION_NAME, "doc_count": collection.count()}
 
 
+# --- Debug endpoints (guarded version also exposes these) ---
+# The guardrails only protect /chat responses. These admin endpoints
+# are unprotected, demonstrating that guardrails on the LLM output
+# don't help when the pipeline config is exposed through other routes.
+
+@app.get("/debug/config")
+def debug_config():
+    """Exposes pipeline configuration. Guardrails don't protect this."""
+    return {
+        "collection_name": COLLECTION_NAME,
+        "embedding_model": "all-MiniLM-L6-v2",
+        "embedding_dimensions": 384,
+        "similarity_metric": "cosine",
+        "chunk_strategy": "whole_document",
+        "chunk_overlap": 0,
+        "n_results": 3,
+        "ollama_model": OLLAMA_MODEL,
+        "ollama_url": OLLAMA_URL,
+        "guardrails_enabled": True,
+        "guardrail_patterns": len(OUTPUT_GUARDRAIL_PATTERNS),
+    }
+
+
+@app.get("/admin/stats")
+def admin_stats():
+    """Exposes collection statistics. Guardrails don't protect this."""
+    try:
+        count = collection.count()
+        peek = collection.peek(limit=3)
+        doc_ids = peek.get("ids", [])
+        metadatas = peek.get("metadatas", [])
+    except Exception:
+        count = 0
+        doc_ids = []
+        metadatas = []
+
+    return {
+        "collection": COLLECTION_NAME,
+        "document_count": count,
+        "sample_ids": doc_ids,
+        "sample_metadata": metadatas,
+        "chroma_dir": CHROMA_DIR,
+        "server_version": "DogfoodRAG 0.1.0 (guarded)",
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8899)
