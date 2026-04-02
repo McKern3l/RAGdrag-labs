@@ -33,13 +33,16 @@ from __future__ import annotations
 import os
 import time
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import chromadb
 import httpx
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
-app = FastAPI(title="DogfoodRAG (Ingestible)", version="0.2.0")
+
+
 
 # --- Config ---
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
@@ -135,15 +138,22 @@ def _check_api_key(x_api_key: str | None):
             raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 
-# --- Routes ---
+# --- Lifespan ---
 
-@app.on_event("startup")
-def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     global collection
     collection = init_collection()
     mode = "GUARDED (API key required)" if REQUIRE_API_KEY else "OPEN (no auth)"
     print(f"[*] DogfoodRAG (Ingestible -- {mode}) ready")
     print(f"[*] Ollama: {OLLAMA_URL} ({OLLAMA_MODEL})")
+    yield
+
+
+app = FastAPI(title="DogfoodRAG (Ingestible)", version="0.2.0", lifespan=lifespan)
+
+
+# --- Routes ---
 
 
 @app.post("/chat")

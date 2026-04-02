@@ -31,6 +31,8 @@ import os
 import re
 import time
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 import chromadb
@@ -38,7 +40,8 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-app = FastAPI(title="DogfoodRAG (Agentic)", version="0.4.0")
+
+
 
 # --- Config ---
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
@@ -186,13 +189,20 @@ class IngestRequest(BaseModel):
     id: str | None = None
 
 
-# --- Routes ---
+# --- Lifespan ---
 
-@app.on_event("startup")
-def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     global collection
     collection = init_collection()
     print(f"[*] DogfoodRAG (Agentic -- tool calling enabled) ready")
+    yield
+
+
+app = FastAPI(title="DogfoodRAG (Agentic)", version="0.4.0", lifespan=lifespan)
+
+
+# --- Routes ---
 
 
 @app.post("/chat")

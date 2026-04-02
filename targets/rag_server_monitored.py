@@ -27,6 +27,8 @@ import os
 import re
 import time
 from collections import deque
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 import chromadb
@@ -34,7 +36,8 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-app = FastAPI(title="DogfoodRAG (Monitored)", version="0.3.0")
+
+
 
 # --- Config ---
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
@@ -170,13 +173,20 @@ class ChatResponse(BaseModel):
     generation_time_ms: float = 0
 
 
-# --- Routes ---
+# --- Lifespan ---
 
-@app.on_event("startup")
-def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     global collection
     collection = init_collection()
     print(f"[*] DogfoodRAG (Monitored -- guardrails + rate limiting + anomaly detection) ready")
+    yield
+
+
+app = FastAPI(title="DogfoodRAG (Monitored)", version="0.3.0", lifespan=lifespan)
+
+
+# --- Routes ---
 
 
 @app.post("/chat")

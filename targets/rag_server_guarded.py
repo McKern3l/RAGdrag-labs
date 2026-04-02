@@ -29,13 +29,14 @@ from __future__ import annotations
 import os
 import re
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import chromadb
 import httpx
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-app = FastAPI(title="DogfoodRAG", version="0.1.0")
 
 # --- Config ---
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
@@ -119,15 +120,22 @@ class ChatResponse(BaseModel):
     generation_time_ms: float = 0
 
 
-# --- Routes ---
+# --- Lifespan ---
 
-@app.on_event("startup")
-def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     global collection
     collection = init_collection()
     print(f"[*] DogfoodRAG server ready")
     print(f"[*] Ollama: {OLLAMA_URL} ({OLLAMA_MODEL})")
     print(f"[*] ChromaDB: {CHROMA_DIR}")
+    yield
+
+
+app = FastAPI(title="DogfoodRAG", version="0.1.0", lifespan=lifespan)
+
+
+# --- Routes ---
 
 
 # --- Output guardrail (intentionally bypassable) ---
