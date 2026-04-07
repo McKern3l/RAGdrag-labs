@@ -4,3 +4,8 @@ __pycache__/
 .DS_Store
 .pytest_cache/
 *.egg-info/
+.venv/
+*.findings.json
+dogfood-results.json
+findings.json
+demo.sh

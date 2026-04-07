@@ -18,6 +18,9 @@ Usage:
 import os
 import sys
 
+# Ensure sibling modules are importable when run from repo root
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 if os.environ.get("GUARDRAILS", "0") == "1":
     print("[*] Loading guarded server (regex output guardrails enabled)")
     from rag_server_guarded import app
