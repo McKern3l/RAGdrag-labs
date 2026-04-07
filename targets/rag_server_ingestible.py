@@ -46,7 +46,7 @@ from pydantic import BaseModel
 
 # --- Config ---
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "blackrainbow:v0.1-dpo")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2")
 CHROMA_DIR = os.environ.get("CHROMA_DIR", "/tmp/ragdrag-lab-ingestible")
 COLLECTION_NAME = "dogfood_docs"
 REQUIRE_API_KEY = os.environ.get("REQUIRE_API_KEY", "").lower() in ("1", "true", "yes")
