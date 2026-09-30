@@ -277,10 +277,11 @@ class TestProbeReporter:
         client = _mock_client(_rag_handler)
         result = run_probe("http://testserver/chat", client)
         report = generate_report(result)
-        assert report["tool"] == "ragdrag"
-        assert report["target"] == "http://testserver/chat"
+        assert report["tool"]["name"] == "ragdrag"
+        assert report["target"]["url"] == "http://testserver/chat"
         assert report["summary"]["total_findings"] >= 2
-        assert "chunk_size_estimate" in report
+        assert report["capabilities"][0]["capability_id"] == "phase.r2"
+        assert "chunk_size_estimate" in report["capabilities"][0]["payload"]
 
     def test_format_summary_from_probe_result(self):
         client = _mock_client(_rag_handler)

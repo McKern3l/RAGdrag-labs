@@ -10,17 +10,25 @@ Test targets, sample results, and exercises for <a href="https://github.com/McKe
 
 This repo contains the lab environment for testing and learning with RAGdrag. It's separate from the main tool so the core stays lean. Everything here is optional.
 
-## Server Fleet
+## Primary Labs
 
-| Server | File | Tests |
+| Lab | File | Coverage |
 |--------|------|-------|
 | **Open** (no guardrails) | `rag_server_open.py` | R1 Fingerprint, R2 Probe, R3 Exfiltrate |
 | **Guarded** (regex filter) | `rag_server_guarded.py` | R3 Exfiltrate (deep bypass) |
-| **Ingestible** (POST /ingest) | `rag_server_ingestible.py` | R4 Poison, R5 Hijack |
-| **Monitored** (logging + anomaly) | `rag_server_monitored.py` | R6 Evade |
-| **Agentic** (tool calling) | `rag_server_agentic.py` | R5 Hijack (RD-0503) |
+| **Full Chain** | `rag_server_fullchain.py` | R1 through R6 in one authorized run |
 
-All servers are intentionally vulnerable. **Do not deploy anywhere accessible.**
+The Full Chain lab combines exposed pipeline metadata, synthetic sensitive data,
+create-only ingestion, verified deletion, simulated tool calls, guardrails,
+monitoring, and real conversation history. Tool calls are evidence only; the lab
+does not make outbound requests.
+
+Specialized `ingestible`, `monitored`, and `agentic` targets remain available for
+isolated R4, R5, and R6 exercises.
+
+All servers are intentionally vulnerable. The Full Chain launcher binds to
+loopback for local use; treat the specialized targets as untrusted lab services.
+**Do not deploy any target or expose it to another network.**
 
 ## Prerequisites
 
@@ -42,12 +50,32 @@ pip install -e ../ragdrag
 # Install lab dependencies
 pip install -e .
 
-# Start a server (requires Ollama running locally)
-python targets/rag_server.py
+# Start the combined target (requires Ollama running locally)
+./start-fullchain.sh
 
-# Run the full kill chain
-ragdrag scan -t http://localhost:8899/chat
+# In another terminal, run the authorized R1-R6 chain
+ragdrag scan --target http://127.0.0.1:8899/chat \
+  --phases R1,R2,R3,R4,R5,R6 \
+  --max-requests 300 \
+  --allow-write \
+  --cleanup-url 'http://127.0.0.1:8899/documents/{id}' \
+  --established-control baseline \
+  --established-control negative-control \
+  --established-control cleanup-verification \
+  --response-field response \
+  --history-field messages \
+  --output fullchain-report.json
 ```
+
+The three `--established-control` flags declare the lab controls you have
+already established: a disposable baseline collection, a negative control, and
+post-run cleanup verification. RAGdrag records every R4/R5 mutation and reports
+exit code 5 if cleanup remains unresolved.
+
+The Full Chain target intentionally returns `403` during R6's rapid-probe
+sequence. A complete lab exercise can therefore exit 2 (`partial`) while still
+executing all six capabilities. Confirm that the report contains R1 through R6,
+that R4/R5 cleanup states are `removed`, and that unresolved cleanup is zero.
 
 ## Configuration
 
@@ -88,7 +116,10 @@ python targets/rag_server.py
 # Guarded server (regex output filtering)
 GUARDRAILS=1 python targets/rag_server.py
 
-# Individual servers directly
+# Full R1-R6 chain
+./start-fullchain.sh
+
+# Specialized component targets
 python targets/rag_server_ingestible.py    # R4 Poison, R5 Hijack
 python targets/rag_server_monitored.py     # R6 Evade
 python targets/rag_server_agentic.py       # R5 Hijack (tool calling)
@@ -103,7 +134,7 @@ pip install -e ".[dev]"
 pytest tests/ -v
 ```
 
-178 tests covering all 6 phases including full kill chain integration.
+190 tests covering all 6 phases including full chain integration.
 
 ## Links
 

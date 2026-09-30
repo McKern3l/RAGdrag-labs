@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ragdrag-labs"
-version = "0.5.0"
+version = "0.6.0"
 description = "Lab servers and e2e tests for RAGdrag security assessment toolkit."
 readme = "README.md"
 license = "MIT"
@@ -13,7 +13,7 @@ authors = [
     { name = "McKern3l" },
 ]
 dependencies = [
-    "ragdrag>=0.5.0",
+    "ragdrag>=0.6.1",
     "fastapi>=0.110",
     "uvicorn>=0.29",
     "chromadb>=0.4",

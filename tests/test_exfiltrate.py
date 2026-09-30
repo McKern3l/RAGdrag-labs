@@ -11,6 +11,7 @@ import json
 import httpx
 import pytest
 
+from ragdrag.adapters.chat import ChatResponseError
 from ragdrag.core.exfiltrate import (
     BLOCKED_RESPONSE_PATTERNS,
     BYPASS_QUERY_PAIRS,
@@ -28,6 +29,7 @@ from ragdrag.core.exfiltrate import (
     run_exfiltrate,
     scan_response_for_credentials,
 )
+from ragdrag.engine.models import OutcomeCode
 
 
 # --- Helpers ---
@@ -228,11 +230,12 @@ class TestResponseParsing:
         text = _extract_response_text(resp, None)
         assert text == "Raw response body"
 
-    def test_extract_missing_field_returns_empty(self):
-        """Returns empty string for missing JSON field."""
+    def test_extract_missing_field_raises_typed_error(self):
+        """Missing configured response fields are explicit protocol failures."""
         resp = httpx.Response(200, json={"other": "value"})
-        text = _extract_response_text(resp, "answer")
-        assert text == ""
+        with pytest.raises(ChatResponseError) as error:
+            _extract_response_text(resp, "answer")
+        assert error.value.outcome is OutcomeCode.UNSUPPORTED_RESPONSE
 
 
 # --- Internal doc indicators ---

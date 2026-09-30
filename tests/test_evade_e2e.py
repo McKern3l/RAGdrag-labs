@@ -133,14 +133,18 @@ class TestQueryObfuscationE2E:
 class TestMultiTurnContextE2E:
     def test_progressive_sequence(self):
         with _client() as client:
-            findings = build_context_sequence(TARGET, client, "progressive_disclosure")
+            findings = build_context_sequence(
+                TARGET, client, "progressive_disclosure", history_field="messages",
+            )
             assert len(findings) >= 1
             assert findings[0].technique_id == "RD-0604"
             assert findings[0].evidence["steps_completed"] >= 1
 
     def test_role_assumption_sequence(self):
         with _client() as client:
-            findings = build_context_sequence(TARGET, client, "role_assumption")
+            findings = build_context_sequence(
+                TARGET, client, "role_assumption", history_field="messages",
+            )
             assert len(findings) >= 1
 
 

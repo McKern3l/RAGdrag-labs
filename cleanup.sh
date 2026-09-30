@@ -8,6 +8,6 @@ lsof -ti:8899 | xargs kill 2>/dev/null
 sleep 1
 
 echo "[*] Clearing ChromaDB caches..."
-rm -rf /tmp/ragdrag-lab-open /tmp/ragdrag-lab-guarded 2>/dev/null
+rm -rf /tmp/ragdrag-lab-open /tmp/ragdrag-lab-guarded /tmp/ragdrag-lab-fullchain 2>/dev/null
 
 echo "[+] Clean. Ready to start fresh."

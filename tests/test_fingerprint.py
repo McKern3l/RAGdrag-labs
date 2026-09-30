@@ -310,10 +310,10 @@ class TestJsonReporter:
             ],
         )
         report = generate_report(result)
-        assert report["tool"] == "ragdrag"
+        assert report["tool"]["name"] == "ragdrag"
         assert report["summary"]["total_findings"] == 2
-        assert report["summary"]["high_confidence"] == 1
-        assert report["summary"]["medium_confidence"] == 1
+        assert report["summary"]["inferred"] == 2
+        assert report["capabilities"][0]["capability_id"] == "phase.r1"
 
     def test_format_summary(self):
         """Reporter formats human-readable summary."""
@@ -328,7 +328,6 @@ class TestJsonReporter:
         report = generate_report(result)
         summary = format_summary(report)
         assert "http://example.com" in summary
-        assert "qdrant" in summary
         assert "RD-0101" in summary
 
     def test_write_report_to_file(self, tmp_path):
@@ -338,7 +337,7 @@ class TestJsonReporter:
         generate_report(result, output_path=out)
         assert out.exists()
         data = json.loads(out.read_text())
-        assert data["target"] == "http://example.com"
+        assert data["target"]["url"] == "http://example.com"
 
 
 # --- measure_elapsed test ---

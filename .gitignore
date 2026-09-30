@@ -8,4 +8,5 @@ __pycache__/
 *.findings.json
 dogfood-results.json
 findings.json
+fullchain-report.json
 demo.sh

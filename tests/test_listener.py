@@ -178,7 +178,8 @@ class TestJsonLogWriting:
         assert data["path"] == "/fetch"
         assert len(data["credentials"]) == 1
         assert data["credentials"][0]["key"] == "api_key"
-        assert data["credentials"][0]["value"] == "mcorp-7f3d"
+        assert data["credentials"][0]["value"] == "<redacted>"
+        assert "mcorp-7f3d" not in output.read_text()
 
     def test_capture_without_credentials_has_no_creds_key(self, tmp_path):
         """Clean captures omit the credentials field."""
@@ -217,7 +218,8 @@ class TestOutputFormatting:
         output = format_request_output(capture)
         assert "[!] CAPTURE" in output
         assert "api_key" in output
-        assert "mcorp-7f3d" in output
+        assert "<redacted>" in output
+        assert "mcorp-7f3d" not in output
 
     def test_normal_request_no_capture_prefix(self):
         """Normal requests do not show CAPTURE prefix."""

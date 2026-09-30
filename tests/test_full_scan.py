@@ -22,9 +22,11 @@ import pytest
 from ragdrag.core.fingerprint import run_full_fingerprint
 from ragdrag.core.probe import run_probe
 from ragdrag.core.exfiltrate import run_exfiltrate
-from ragdrag.core.poison import run_poison
+from ragdrag.core.poison import CleanupStrategy, run_poison
 from ragdrag.core.hijack import run_hijack
 from ragdrag.core.evade import run_evade
+from ragdrag.engine.models import CleanupState
+from ragdrag.engine.mutations import MutationLedger
 
 
 # --- Full-featured mock server ---
@@ -71,6 +73,11 @@ def _full_handler(request: httpx.Request) -> httpx.Response:
         doc_id = body.get("id", f"injected-{uuid.uuid4().hex[:8]}")
         _injected_docs[doc_id] = {"text": text}
         return httpx.Response(201, json={"status": "ok", "id": doc_id})
+
+    if method == "DELETE" and path.startswith("/documents/"):
+        doc_id = path.rsplit("/", 1)[-1]
+        _injected_docs.pop(doc_id, None)
+        return httpx.Response(200, json={"status": "deleted", "id": doc_id})
 
     if method == "OPTIONS":
         return httpx.Response(200)
@@ -129,6 +136,7 @@ def _client():
 
 TARGET = "http://testserver/chat"
 INGEST = "http://testserver/ingest"
+CLEANUP = CleanupStrategy("http://testserver/documents/{id}")
 
 
 class TestFullKillChain:
@@ -157,16 +165,36 @@ class TestFullKillChain:
 
     def test_r4_poison(self):
         with _client() as client:
-            result = run_poison(TARGET, client, ingest_url=INGEST)
+            mutations = MutationLedger()
+            result = run_poison(
+                TARGET,
+                client,
+                ingest_url=INGEST,
+                mutations=mutations,
+                cleanup_strategy=CLEANUP,
+            )
+            mutations.cleanup_all()
             assert result.target == TARGET
             assert len(result.injected_documents) >= 1
             assert len(result.findings) >= 1
+            assert mutations.has_unresolved is False
+            assert all(record.state is CleanupState.REMOVED for record in mutations.records)
 
     def test_r5_hijack(self):
         with _client() as client:
-            result = run_hijack(TARGET, client, ingest_url=INGEST)
+            mutations = MutationLedger()
+            result = run_hijack(
+                TARGET,
+                client,
+                ingest_url=INGEST,
+                mutations=mutations,
+                cleanup_strategy=CLEANUP,
+            )
+            mutations.cleanup_all()
             assert result.target == TARGET
             assert len(result.findings) >= 1
+            assert mutations.has_unresolved is False
+            assert all(record.state is CleanupState.REMOVED for record in mutations.records)
 
     def test_r6_evade(self):
         with _client() as client:
@@ -178,6 +206,7 @@ class TestFullKillChain:
         """Run all 6 phases in order against the same client."""
         with _client() as client:
             all_findings = []
+            mutations = MutationLedger()
 
             r1 = run_full_fingerprint(TARGET, client, scan_ports=False)
             all_findings.extend(r1.findings)
@@ -188,14 +217,28 @@ class TestFullKillChain:
             r3 = run_exfiltrate(TARGET, client, deep=False)
             all_findings.extend(r3.findings)
 
-            r4 = run_poison(TARGET, client, ingest_url=INGEST)
+            r4 = run_poison(
+                TARGET,
+                client,
+                ingest_url=INGEST,
+                mutations=mutations,
+                cleanup_strategy=CLEANUP,
+            )
             all_findings.extend(r4.findings)
 
-            r5 = run_hijack(TARGET, client, ingest_url=INGEST)
+            r5 = run_hijack(
+                TARGET,
+                client,
+                ingest_url=INGEST,
+                mutations=mutations,
+                cleanup_strategy=CLEANUP,
+            )
             all_findings.extend(r5.findings)
 
             r6 = run_evade(TARGET, client)
             all_findings.extend(r6.findings)
+
+            mutations.cleanup_all()
 
             # Should have findings from multiple phases
             technique_prefixes = set()
@@ -205,3 +248,5 @@ class TestFullKillChain:
 
             assert len(all_findings) >= 6  # At minimum one per phase
             assert len(technique_prefixes) >= 3  # Findings from at least 3 different phases
+            assert mutations.has_unresolved is False
+            assert _injected_docs == {}

